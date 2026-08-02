@@ -1,40 +1,32 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { rowsToObjects } from '../dbUtils.js';
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  const rows = db.prepare('SELECT key, value FROM site_settings').all();
+async function loadSettings() {
+  const result = await db.execute('SELECT key, value FROM site_settings');
   const settings = {};
-  for (const row of rows) {
+  for (const row of rowsToObjects(result)) {
     try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
   }
-  res.json(settings);
+  return settings;
+}
+
+router.get('/', async (req, res) => {
+  res.json(await loadSettings());
 });
 
-router.put('/', requireAuth, (req, res) => {
+router.put('/', requireAuth, async (req, res) => {
   const body = req.body || {};
-  const stmt = db.prepare(
-    'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
-  );
-  db.exec('BEGIN');
-  try {
-    for (const [key, value] of Object.entries(body)) {
-      stmt.run(key, JSON.stringify(value));
-    }
-    db.exec('COMMIT');
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
+  for (const [key, value] of Object.entries(body)) {
+    await db.execute({
+      sql: 'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      args: [key, JSON.stringify(value)],
+    });
   }
-
-  const rows = db.prepare('SELECT key, value FROM site_settings').all();
-  const settings = {};
-  for (const row of rows) {
-    try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
-  }
-  res.json(settings);
+  res.json(await loadSettings());
 });
 
 export default router;

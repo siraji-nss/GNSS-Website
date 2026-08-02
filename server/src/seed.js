@@ -1,17 +1,27 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
-import db from './db.js';
+import db, { migrate } from './db.js';
+import { rowsToObjects } from './dbUtils.js';
+
+await migrate();
+
+async function countRows(table) {
+  const result = await db.execute(`SELECT COUNT(*) c FROM ${table}`);
+  return Number(rowsToObjects(result)[0].c);
+}
 
 // Only creates the admin user if none exists yet — never overwrites an
 // existing password hash, so this stays safe to run on every server boot
 // without undoing a password change made later via Admin > Change Password.
 const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-const existingAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get(adminUsername);
+const existingAdmin = rowsToObjects(
+  await db.execute({ sql: 'SELECT id FROM users WHERE username = ?', args: [adminUsername] })
+)[0];
 if (!existingAdmin) {
-  db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(
-    adminUsername,
-    bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'ChangeMe123!', 10)
-  );
+  await db.execute({
+    sql: 'INSERT INTO users (username, password_hash) VALUES (?, ?)',
+    args: [adminUsername, bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'ChangeMe123!', 10)],
+  });
   console.log(`Admin user created: ${adminUsername}`);
 } else {
   console.log(`Admin user already exists: ${adminUsername}`);
@@ -32,90 +42,90 @@ const settings = {
   linkedin_url: '',
   services_disclaimer: 'Our services provide professional guidance for student admissions and visa processing. While we ensure high standards of accuracy, we do not guarantee visa approval.',
 };
-const upsertSetting = db.prepare(
-  'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
-);
-for (const [k, v] of Object.entries(settings)) upsertSetting.run(k, JSON.stringify(v));
+for (const [k, v] of Object.entries(settings)) {
+  await db.execute({
+    sql: 'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    args: [k, JSON.stringify(v)],
+  });
+}
 
 // ---- Hero slides ----
-if (db.prepare('SELECT COUNT(*) c FROM hero_slides').get().c === 0) {
-  const stmt = db.prepare(
-    'INSERT INTO hero_slides (headline, subheadline, image_url, cta_label, cta_link, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)'
-  );
-  stmt.run('Your dream to study abroad can start here!', 'Navigating Your Educational Horizon with Integrity', '', 'Start Your Journey', '/contact', 1);
-  stmt.run('Your Pathway to Higher Study', 'Expert, transparent guidance across seven global destinations', '', 'Explore Destinations', '/services', 2);
+if ((await countRows('hero_slides')) === 0) {
+  const sql = 'INSERT INTO hero_slides (headline, subheadline, image_url, cta_label, cta_link, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)';
+  await db.execute({ sql, args: ['Your dream to study abroad can start here!', 'Navigating Your Educational Horizon with Integrity', '', 'Start Your Journey', '/contact', 1] });
+  await db.execute({ sql, args: ['Your Pathway to Higher Study', 'Expert, transparent guidance across seven global destinations', '', 'Explore Destinations', '/services', 2] });
 }
 
 // ---- About content ----
-db.prepare(
-  `INSERT INTO about_content (id, mission, vision, intro) VALUES (1, ?, ?, ?)
-   ON CONFLICT(id) DO UPDATE SET mission = excluded.mission, vision = excluded.vision, intro = excluded.intro`
-).run(
-  'We are dedicated to providing expert, transparent, and personalized guidance that simplifies the complexities of university admissions and visa processing.',
-  'We aim to be the leading force in educational and migration consultancy across our destination countries.',
-  'We provide elegant and streamlined solutions for students seeking international academic excellence — handling everything from course selection through student visa acquisition across seven destinations, with transparency and student success at our core.'
-);
+await db.execute({
+  sql: `INSERT INTO about_content (id, mission, vision, intro) VALUES (1, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET mission = excluded.mission, vision = excluded.vision, intro = excluded.intro`,
+  args: [
+    'We are dedicated to providing expert, transparent, and personalized guidance that simplifies the complexities of university admissions and visa processing.',
+    'We aim to be the leading force in educational and migration consultancy across our destination countries.',
+    'We provide elegant and streamlined solutions for students seeking international academic excellence — handling everything from course selection through student visa acquisition across seven destinations, with transparency and student success at our core.',
+  ],
+});
 
 // ---- Core values ----
-if (db.prepare('SELECT COUNT(*) c FROM core_values').get().c === 0) {
-  const stmt = db.prepare('INSERT INTO core_values (title, description, sort_order) VALUES (?, ?, ?)');
-  stmt.run('Honesty Without Borders', 'We believe in complete transparency at every step, giving you honest advice even when it is not what you want to hear.', 1);
-  stmt.run('Deep Expertise', 'Our team brings specialized, up-to-date knowledge of admissions and visa requirements across seven countries.', 2);
-  stmt.run('Your Story, Your Path', 'Every student journey is unique. We tailor our guidance to your goals, background, and aspirations.', 3);
-  stmt.run('Accountability', 'We stand behind our guidance and support you at every stage, from first consultation to post-arrival.', 4);
+if ((await countRows('core_values')) === 0) {
+  const sql = 'INSERT INTO core_values (title, description, sort_order) VALUES (?, ?, ?)';
+  await db.execute({ sql, args: ['Honesty Without Borders', 'We believe in complete transparency at every step, giving you honest advice even when it is not what you want to hear.', 1] });
+  await db.execute({ sql, args: ['Deep Expertise', 'Our team brings specialized, up-to-date knowledge of admissions and visa requirements across seven countries.', 2] });
+  await db.execute({ sql, args: ['Your Story, Your Path', 'Every student journey is unique. We tailor our guidance to your goals, background, and aspirations.', 3] });
+  await db.execute({ sql, args: ['Accountability', 'We stand behind our guidance and support you at every stage, from first consultation to post-arrival.', 4] });
 }
 
 // ---- Why choose us pillars ----
-if (db.prepare('SELECT COUNT(*) c FROM why_choose_pillars').get().c === 0) {
-  const stmt = db.prepare('INSERT INTO why_choose_pillars (title, headline, description, sort_order) VALUES (?, ?, ?, ?)');
-  stmt.run('Value & Transparency', 'Honest Pricing, Real Value', 'No hidden fees, ever. We believe in clear, upfront pricing so you always know exactly what you are paying for.', 1);
-  stmt.run('Trust & Proof', 'A Legacy of Success Stories', 'Thousands of successful admissions and visa approvals across our destination countries speak for themselves.', 2);
-  stmt.run('Speed & Precision', 'Accuracy That Accelerates Outcomes', 'Meticulous, error-free applications that move through the process faster.', 3);
-  stmt.run('Support & Partnership', 'By Your Side, Always', 'Around-the-clock support from your first consultation through your arrival abroad.', 4);
+if ((await countRows('why_choose_pillars')) === 0) {
+  const sql = 'INSERT INTO why_choose_pillars (title, headline, description, sort_order) VALUES (?, ?, ?, ?)';
+  await db.execute({ sql, args: ['Value & Transparency', 'Honest Pricing, Real Value', 'No hidden fees, ever. We believe in clear, upfront pricing so you always know exactly what you are paying for.', 1] });
+  await db.execute({ sql, args: ['Trust & Proof', 'A Legacy of Success Stories', 'Thousands of successful admissions and visa approvals across our destination countries speak for themselves.', 2] });
+  await db.execute({ sql, args: ['Speed & Precision', 'Accuracy That Accelerates Outcomes', 'Meticulous, error-free applications that move through the process faster.', 3] });
+  await db.execute({ sql, args: ['Support & Partnership', 'By Your Side, Always', 'Around-the-clock support from your first consultation through your arrival abroad.', 4] });
 }
 
 // ---- Target countries ----
-if (db.prepare('SELECT COUNT(*) c FROM target_countries').get().c === 0) {
-  const stmt = db.prepare(
-    'INSERT INTO target_countries (name, slug, tagline, highlight, image_url, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)'
-  );
-  stmt.run('Australia', 'australia', 'Top-100 universities & strong post-grad employment', 'Top-100 Universities', '', 1);
-  stmt.run('United Kingdom', 'united-kingdom', 'Historic institutions, globally respected degrees', 'World-Renowned Degrees', '', 2);
-  stmt.run('New Zealand', 'new-zealand', 'Creative, research-focused education', 'Research-Focused', '', 3);
-  stmt.run('Finland', 'finland', 'Free-thinking education system & top quality of life', 'Top Quality of Life', '', 4);
-  stmt.run('South Korea', 'south-korea', 'A global innovation leader', 'Innovation Leader', '', 5);
-  stmt.run('Malaysia', 'malaysia', 'World-class, affordable degrees', 'Affordable Degrees', '', 6);
-  stmt.run('Malta', 'malta', 'English-speaking gateway to Europe', 'Gateway to Europe', '', 7);
+if ((await countRows('target_countries')) === 0) {
+  const sql = 'INSERT INTO target_countries (name, slug, tagline, highlight, image_url, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)';
+  await db.execute({ sql, args: ['Australia', 'australia', 'Top-100 universities & strong post-grad employment', 'Top-100 Universities', '', 1] });
+  await db.execute({ sql, args: ['United Kingdom', 'united-kingdom', 'Historic institutions, globally respected degrees', 'World-Renowned Degrees', '', 2] });
+  await db.execute({ sql, args: ['New Zealand', 'new-zealand', 'Creative, research-focused education', 'Research-Focused', '', 3] });
+  await db.execute({ sql, args: ['Finland', 'finland', 'Free-thinking education system & top quality of life', 'Top Quality of Life', '', 4] });
+  await db.execute({ sql, args: ['South Korea', 'south-korea', 'A global innovation leader', 'Innovation Leader', '', 5] });
+  await db.execute({ sql, args: ['Malaysia', 'malaysia', 'World-class, affordable degrees', 'Affordable Degrees', '', 6] });
+  await db.execute({ sql, args: ['Malta', 'malta', 'English-speaking gateway to Europe', 'Gateway to Europe', '', 7] });
 }
 
 // ---- Working process steps ----
-if (db.prepare('SELECT COUNT(*) c FROM working_process_steps').get().c === 0) {
-  const stmt = db.prepare('INSERT INTO working_process_steps (step_number, title, description, sort_order) VALUES (?, ?, ?, ?)');
-  stmt.run(1, 'Initial Consultation', 'A free session to understand your goals, academic background, and ideal destination.', 1);
-  stmt.run(2, 'Action Orientation', 'We prepare your application, documentation, and Statement of Purpose with precision.', 2);
-  stmt.run(3, 'Submission and Support', 'We lodge your application and visa file, briefing you every step of the way to your departure.', 3);
+if ((await countRows('working_process_steps')) === 0) {
+  const sql = 'INSERT INTO working_process_steps (step_number, title, description, sort_order) VALUES (?, ?, ?, ?)';
+  await db.execute({ sql, args: [1, 'Initial Consultation', 'A free session to understand your goals, academic background, and ideal destination.', 1] });
+  await db.execute({ sql, args: [2, 'Action Orientation', 'We prepare your application, documentation, and Statement of Purpose with precision.', 2] });
+  await db.execute({ sql, args: [3, 'Submission and Support', 'We lodge your application and visa file, briefing you every step of the way to your departure.', 3] });
 }
 
 // ---- Testimonials (placeholder sample data — replace with real success stories from Admin) ----
-if (db.prepare('SELECT COUNT(*) c FROM testimonials').get().c === 0) {
-  const stmt = db.prepare('INSERT INTO testimonials (name, quote, country, image_url, sort_order) VALUES (?, ?, ?, ?, ?)');
-  stmt.run('Sample Student', 'Replace this with a real success story from Admin > Testimonials. GlobalNest guided me through every step of my visa application.', 'Australia', '', 1);
-  stmt.run('Sample Student', 'Replace this with a real success story from Admin > Testimonials. The team was transparent and responsive throughout.', 'Malta', '', 2);
+if ((await countRows('testimonials')) === 0) {
+  const sql = 'INSERT INTO testimonials (name, quote, country, image_url, sort_order) VALUES (?, ?, ?, ?, ?)';
+  await db.execute({ sql, args: ['Sample Student', 'Replace this with a real success story from Admin > Testimonials. GlobalNest guided me through every step of my visa application.', 'Australia', '', 1] });
+  await db.execute({ sql, args: ['Sample Student', 'Replace this with a real success story from Admin > Testimonials. The team was transparent and responsive throughout.', 'Malta', '', 2] });
 }
 
 // ---- Blog (placeholder starter post) ----
-if (db.prepare('SELECT COUNT(*) c FROM blog_posts').get().c === 0) {
-  db.prepare(
-    `INSERT INTO blog_posts (title, slug, excerpt, content, cover_image, author, is_published, published_at)
-     VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))`
-  ).run(
-    'Welcome to the GlobalNest Blog',
-    'welcome-to-the-globalnest-blog',
-    'Weekly updates on scholarships, visa policy changes, and student lifestyle guidance — edit or delete this post from Admin > Blog.',
-    'This is a placeholder post. Use the Admin panel to publish weekly updates covering scholarships, visa policy changes, and student lifestyle guidance for our seven destination countries.',
-    '',
-    'GlobalNest Team'
-  );
+if ((await countRows('blog_posts')) === 0) {
+  await db.execute({
+    sql: `INSERT INTO blog_posts (title, slug, excerpt, content, cover_image, author, is_published, published_at)
+          VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))`,
+    args: [
+      'Welcome to the GlobalNest Blog',
+      'welcome-to-the-globalnest-blog',
+      'Weekly updates on scholarships, visa policy changes, and student lifestyle guidance — edit or delete this post from Admin > Blog.',
+      'This is a placeholder post. Use the Admin panel to publish weekly updates covering scholarships, visa policy changes, and student lifestyle guidance for our seven destination countries.',
+      '',
+      'GlobalNest Team',
+    ],
+  });
 }
 
 // ---- Country services ----
@@ -277,22 +287,20 @@ const countryServices = [
   },
 ];
 
-if (db.prepare('SELECT COUNT(*) c FROM country_services').get().c === 0) {
-  const stmt = db.prepare(
-    `INSERT INTO country_services
+if ((await countRows('country_services')) === 0) {
+  const sql = `INSERT INTO country_services
       (country_name, slug, page_title, meta_description, hero_tagline, intro, why_choose_points, requirements, process_steps, faqs, processing_time, visa_fee, tuition_range, living_cost, extra_notes, sort_order, is_published)
-     VALUES (@country_name, @slug, @page_title, @meta_description, @hero_tagline, @intro, @why_choose_points, @requirements, @process_steps, @faqs, @processing_time, @visa_fee, @tuition_range, @living_cost, @extra_notes, @sort_order, 1)`
-  );
-  countryServices.forEach((c, i) => {
-    stmt.run({
-      ...c,
-      why_choose_points: JSON.stringify(c.why_choose_points),
-      requirements: JSON.stringify(c.requirements),
-      process_steps: JSON.stringify(c.process_steps),
-      faqs: JSON.stringify(c.faqs),
-      sort_order: i + 1,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`;
+  for (const [i, c] of countryServices.entries()) {
+    await db.execute({
+      sql,
+      args: [
+        c.country_name, c.slug, c.page_title, c.meta_description, c.hero_tagline, c.intro,
+        JSON.stringify(c.why_choose_points), JSON.stringify(c.requirements), JSON.stringify(c.process_steps), JSON.stringify(c.faqs),
+        c.processing_time, c.visa_fee, c.tuition_range, c.living_cost, c.extra_notes, i + 1,
+      ],
     });
-  });
+  }
 }
 
 console.log('Seed complete.');

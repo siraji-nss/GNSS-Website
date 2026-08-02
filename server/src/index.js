@@ -2,8 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
-import db from './db.js';
-import { uploadsDir } from './paths.js';
+import db, { migrate } from './db.js';
+import { rowsToObjects } from './dbUtils.js';
 import authRoutes from './routes/auth.js';
 import settingsRoutes from './routes/settings.js';
 import aboutRoutes from './routes/about.js';
@@ -15,13 +15,11 @@ import { crudRouter } from './routes/crud.js';
 const app = express();
 
 // Trust the reverse proxy (Render/Railway) so req.protocol reflects the
-// original https:// scheme instead of the http:// used internally — this
-// matters for the absolute URLs built into the Excel export.
+// original https:// scheme instead of the http:// used internally.
 app.set('trust proxy', 1);
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(',') || '*' }));
 app.use(express.json({ limit: '2mb' }));
-app.use('/uploads', express.static(uploadsDir));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', settingsRoutes);
@@ -50,8 +48,9 @@ app.use(
   )
 );
 
-app.get('/api/country-services/slug/:slug', (req, res) => {
-  const row = db.prepare('SELECT * FROM country_services WHERE slug = ?').get(req.params.slug);
+app.get('/api/country-services/slug/:slug', async (req, res) => {
+  const result = await db.execute({ sql: 'SELECT * FROM country_services WHERE slug = ?', args: [req.params.slug] });
+  const row = rowsToObjects(result)[0];
   if (!row) return res.status(404).json({ error: 'Not found' });
   const jsonFields = ['why_choose_points', 'requirements', 'process_steps', 'faqs'];
   for (const f of jsonFields) {
@@ -63,6 +62,14 @@ app.get('/api/country-services/slug/:slug', (req, res) => {
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 const port = process.env.PORT || 4000;
-app.listen(port, () => {
-  console.log(`GlobalNest API listening on http://localhost:${port}`);
-});
+
+migrate()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`GlobalNest API listening on http://localhost:${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to migrate database:', err);
+    process.exit(1);
+  });

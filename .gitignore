@@ -9,11 +9,10 @@ server/.env
 .env
 .env.local
 
-# Runtime data — SQLite database + WAL/SHM files, and uploaded documents/images.
-# These are generated at runtime (seeded by server/src/seed.js) and may contain
-# real student PII; they don't belong in version control.
+# Local dev database (SQLite file + WAL/SHM). Generated at runtime (seeded
+# by server/src/seed.js) and may contain real student PII; doesn't belong in
+# version control. Production uses Turso instead of this local file.
 server/data/
-server/uploads/
 
 # Logs
 *.log

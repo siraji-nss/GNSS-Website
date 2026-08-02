@@ -6,9 +6,10 @@ content on the site, and view/export student inquiry form responses to Excel.
 
 ## Stack
 
-- **server/** — Node.js + Express API, SQLite database (Node's built-in
-  `node:sqlite`, no native build tools required), JWT admin auth, image
-  uploads, Excel export (`exceljs`).
+- **server/** — Node.js + Express API, SQLite-compatible database via
+  `@libsql/client` (a local file for dev, [Turso](https://turso.tech) in
+  production), JWT admin auth, image/document uploads via
+  [Cloudinary](https://cloudinary.com), Excel export (`exceljs`).
 - **client/** — React + Vite. One app serving both the public site and the
   `/admin` panel (client-side routed, protected by a login).
 
@@ -107,15 +108,16 @@ Google Fonts in `client/index.html`.
 ```
 server/
   src/
-    db.js              # SQLite schema
+    db.js              # Turso/libSQL client + schema migration
+    dbUtils.js          # shared row-object conversion helper
+    cloudinary.js, cloudinaryStorage.js  # upload storage engine
     seed.js             # admin user + initial content from requirements doc
     auth.js, middleware/requireAuth.js
     routes/
       crud.js            # generic CRUD factory used by most content routes
       auth.js, settings.js, about.js, blog.js, inquiries.js, upload.js
     index.js            # Express app + route wiring
-  uploads/              # uploaded images (served at /uploads)
-  data/globalnest.db    # SQLite database file
+  data/globalnest.db    # local dev database file only (prod uses Turso)
 
 client/
   src/
@@ -130,7 +132,9 @@ client/
 
 ## Deployment
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the full step-by-step guide —
-frontend on Vercel, backend on Render (needs a persistent disk for the
-SQLite database and uploaded images/documents, which is why the backend
-can't run as Vercel serverless functions as-is).
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full step-by-step guide — a
+fully free-tier split deploy: frontend on Vercel, backend on Render, database
+on Turso, file storage on Cloudinary. (The backend still can't run as Vercel
+serverless functions as-is — it's a long-running Express server — but with
+the database and uploads both hosted externally, it no longer needs local
+disk at all, so Render's free tier works fine.)

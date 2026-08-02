@@ -1,19 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'node:path';
-import { nanoid } from 'nanoid';
+import { cloudinaryStorage } from '../cloudinaryStorage.js';
 import { requireAuth } from '../middleware/requireAuth.js';
-import { uploadsDir } from '../paths.js';
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${nanoid(12)}${ext}`);
-  },
-});
 
 const ALLOWED = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg']);
+
+const storage = cloudinaryStorage({ folder: 'globalnest/site-images', resourceType: 'image' });
 
 const upload = multer({
   storage,
@@ -27,9 +20,12 @@ const upload = multer({
 
 const router = Router();
 
-router.post('/', requireAuth, upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  res.status(201).json({ url: `/uploads/${req.file.filename}` });
+router.post('/', requireAuth, (req, res) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    res.status(201).json({ url: req.file.path });
+  });
 });
 
 export default router;
