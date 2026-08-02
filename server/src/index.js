@@ -18,7 +18,8 @@ const app = express();
 // original https:// scheme instead of the http:// used internally.
 app.set('trust proxy', 1);
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(',') || '*' }));
+const allowedOrigins = process.env.CLIENT_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean);
+app.use(cors({ origin: allowedOrigins?.length ? allowedOrigins : '*' }));
 app.use(express.json({ limit: '2mb' }));
 
 app.use('/api/auth', authRoutes);
