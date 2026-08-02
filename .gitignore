@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+client/dist/
+
+# Environment secrets (never commit real credentials)
+server/.env
+.env
+.env.local
+
+# Runtime data — SQLite database + WAL/SHM files, and uploaded documents/images.
+# These are generated at runtime (seeded by server/src/seed.js) and may contain
+# real student PII; they don't belong in version control.
+server/data/
+server/uploads/
+
+# Logs
+*.log
+.dist/
+
+# Editor/OS cruft
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
