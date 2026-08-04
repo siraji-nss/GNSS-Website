@@ -42,9 +42,12 @@ const settings = {
   linkedin_url: '',
   services_disclaimer: 'Our services provide professional guidance for student admissions and visa processing. While we ensure high standards of accuracy, we do not guarantee visa approval.',
 };
+// ON CONFLICT DO NOTHING — seeds a default only the first time a key is
+// created. Must never overwrite a value the admin has already edited via
+// Admin > Site Settings, including on every later server boot.
 for (const [k, v] of Object.entries(settings)) {
   await db.execute({
-    sql: 'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    sql: 'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING',
     args: [k, JSON.stringify(v)],
   });
 }
@@ -57,9 +60,11 @@ if ((await countRows('hero_slides')) === 0) {
 }
 
 // ---- About content ----
+// Same fix as site_settings above — only seed the row once, never overwrite
+// an admin edit made via Admin > About Page on a later boot.
 await db.execute({
   sql: `INSERT INTO about_content (id, mission, vision, intro) VALUES (1, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET mission = excluded.mission, vision = excluded.vision, intro = excluded.intro`,
+        ON CONFLICT(id) DO NOTHING`,
   args: [
     'We are dedicated to providing expert, transparent, and personalized guidance that simplifies the complexities of university admissions and visa processing.',
     'We aim to be the leading force in educational and migration consultancy across our destination countries.',
