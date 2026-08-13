@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import WhatsAppButton from './WhatsAppButton';
+import ConsultationPopup from './ConsultationPopup';
 
 export default function PublicLayout() {
   const location = useLocation();
@@ -19,6 +20,7 @@ export default function PublicLayout() {
       </main>
       <Footer />
       <WhatsAppButton />
+      <ConsultationPopup />
     </>
   );
 }

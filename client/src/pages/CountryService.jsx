@@ -27,11 +27,22 @@ export default function CountryService() {
 
   if (loading) return <div className="section container">Loading...</div>;
   if (notFound || !data) {
+    const countryName = slug
+      ?.split('-')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
     return (
-      <div className="section container center">
-        <h1>Destination Not Found</h1>
-        <p className="lede center">We couldn't find guidance for that destination yet.</p>
-        <Link to="/services" className="btn btn-primary">Back to Services</Link>
+      <div className="section container center" style={{ maxWidth: 560 }}>
+        <span className="eyebrow center">{countryName || 'This Destination'}</span>
+        <h1>Detailed Guidance Is On Its Way</h1>
+        <p className="lede center">
+          We're still preparing a full visa guide for this destination. Book a free consultation and one of
+          our counsellors will walk you through everything in person.
+        </p>
+        <div className="hero__actions" style={{ justifyContent: 'center', marginTop: 8 }}>
+          <Link to="/contact" className="btn btn-gold">Book Free Consultation</Link>
+          <Link to="/services" className="btn btn-outline">Browse Destinations</Link>
+        </div>
       </div>
     );
   }

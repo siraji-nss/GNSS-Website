@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, resolveMediaUrl } from '../api/client';
-import InquiryForm from '../components/InquiryForm';
 
 function HeroCarousel({ slides }) {
   const [index, setIndex] = useState(0);
@@ -74,9 +73,22 @@ export default function Home() {
     api.get('/blog').then((d) => setPosts(d.slice(0, 3)));
   }, []);
 
+  const countryCount = countries.length;
+
   return (
     <>
       <HeroCarousel slides={heroSlides} />
+
+      <section className="section cta-band">
+        <div className="container center">
+          <h2>Ready to start your journey?</h2>
+          <p className="lede center">
+            Book a free consultation with our counsellors and take the first confident step toward your
+            international study journey.
+          </p>
+          <Link to="/contact" className="btn btn-gold">Book Free Consultation</Link>
+        </div>
+      </section>
 
       <section className="section">
         <div className="container welcome-grid">
@@ -89,16 +101,12 @@ export default function Home() {
           </div>
           <div className="welcome-grid__stats">
             <div className="stat-card">
-              <strong>7</strong>
+              <strong>{countryCount || '—'}</strong>
               <span>Study Destinations</span>
             </div>
             <div className="stat-card">
               <strong>4</strong>
               <span>Step Guided Process</span>
-            </div>
-            <div className="stat-card stat-card--gold">
-              <strong>Honesty</strong>
-              <span>Without Borders</span>
             </div>
           </div>
         </div>
@@ -108,7 +116,9 @@ export default function Home() {
         <div className="container">
           <div className="center" style={{ maxWidth: 640, marginBottom: 48 }}>
             <span className="eyebrow center">Our Target Countries</span>
-            <h2 className="center">Seven Destinations, One Trusted Partner</h2>
+            <h2 className="center">
+              {countryCount ? `${countryCount} Destination${countryCount === 1 ? '' : 's'}, One Trusted Partner` : 'Destinations, One Trusted Partner'}
+            </h2>
           </div>
           <div className="grid grid-4">
             {countries.map((c) => (
@@ -231,22 +241,6 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      <section className="section cta-section">
-        <div className="container cta-grid">
-          <div>
-            <span className="eyebrow">Get Started Today</span>
-            <h2>Your Pathway to World-Class Education</h2>
-            <p className="lede">
-              Book a free consultation with our counsellors and take the first confident step toward your
-              international study journey.
-            </p>
-          </div>
-          <div className="card">
-            <InquiryForm />
-          </div>
-        </div>
-      </section>
     </>
   );
 }
