@@ -15,15 +15,17 @@ const BLANK_FORM = (defaultCountry) => ({
 
 export default function InquiryForm({ variant = 'card', defaultCountry = 'Australia' }) {
   const [countries, setCountries] = useState([]);
+  const [countriesLoaded, setCountriesLoaded] = useState(false);
   const [form, setForm] = useState(BLANK_FORM(defaultCountry));
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get('/target-countries').then((data) => {
-      setCountries(data.filter((c) => c.is_active));
-    }).catch(() => {});
+    api.get('/target-countries')
+      .then((data) => setCountries(data.filter((c) => c.is_active)))
+      .catch(() => {})
+      .finally(() => setCountriesLoaded(true));
   }, []);
 
   function update(key, value) {
@@ -87,11 +89,10 @@ export default function InquiryForm({ variant = 'card', defaultCountry = 'Austra
         <label>
           Desired Country
           <select value={form.desired_country} onChange={(e) => update('desired_country', e.target.value)}>
-            {(countries.length ? countries.map((c) => c.name) : ['Australia', 'United Kingdom', 'New Zealand', 'Finland', 'South Korea', 'Malaysia', 'Malta']).map(
-              (name) => (
-                <option key={name} value={name}>{name}</option>
-              )
-            )}
+            {!countriesLoaded && <option value="">Loading destinations…</option>}
+            {countries.map((c) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
           </select>
         </label>
         <label>
